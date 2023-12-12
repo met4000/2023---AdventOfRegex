@@ -7,12 +7,13 @@
     conditions = conditions.split("");
     damagedGroups = damagedGroups.split(",").map(v => parseInt(v));
 
+    let unfoldedConditions = conditions, unfoldedDamagedGroups = damagedGroups;
     for (let i = 0; i < N_UNFOLD - 1; i++) {
-      conditions = conditions.concat(UNKNOWN, conditions);
-      damagedGroups = damagedGroups.concat(damagedGroups);
+      unfoldedConditions = unfoldedConditions.concat(UNKNOWN, conditions);
+      unfoldedDamagedGroups = unfoldedDamagedGroups.concat(damagedGroups);
     }
 
-    return { conditions, damagedGroups };
+    return { conditions: unfoldedConditions, damagedGroups: unfoldedDamagedGroups };
   });
 
   function computeNumArrangements(conditions, damagedGroups, currentGroupLength = 0) {
@@ -94,7 +95,7 @@
 
         // nothing can fit
         if (damagedGroups[0].length > nUnknown) {
-          if (damagedGroups[0].length > nUnknown + nTrailingDamaged) {
+          if (damagedGroups[0].length > combinedPatchSize) {
             // ... including in the group after the unknowns; failure
             return 0;
           }
@@ -114,33 +115,25 @@
         }
 
 
-        // compute freeLeft = ~??|.~ and freeRight = ~?.|~ (where | is the end of the patch)
-        // and add together, removing the intersection that was double-counted intersection (i.e. ~?.|.~)
+        // assume ~| => ~|. (where | is the end of the patch)
 
-        function f(LHS, RHS) {
-          let nPatchArrangements = 0;
-          for (let value of [DAMAGED, OPERATIONAL]) nPatchArrangements += computeNumArrangements(
-            [value].concat(conditions.slice(1, LHS)),
-            damagedGroups.slice(0, nPossibleGroups),
+        let nPatchArrangements = 0;
+        for (let value of [DAMAGED, OPERATIONAL]) nPatchArrangements += computeNumArrangements(
+          [value].concat(conditions.slice(1, combinedPatchSize)),
+          damagedGroups.slice(0, nPossibleGroups),
+          0
+        );
+
+        let nFollowingArrangements = 0;
+        for (let i = 0; i < nPossibleGroups; i++) {
+          nFollowingArrangements += computeNumArrangements(
+            conditions.slice(combinedPatchSize + 1), // +1 from assumption
+            damagedGroups.slice(i + 1),
             0
           );
-
-          let nFollowingArrangements = 0;
-          for (let i = 0; i < nPossibleGroups; i++) {
-            nFollowingArrangements += computeNumArrangements(
-              conditions.slice(RHS),
-              damagedGroups.slice(i + 1),
-              0
-            );
-          }
-
-          return nPatchArrangements * nFollowingArrangements;
         }
 
-        let freeLeft = f(combinedPatchSize, combinedPatchSize + 1);
-        let freeRight = nTrailingDamaged ? 0 : f(combinedPatchSize - 1, combinedPatchSize);
-        let freeLRIntersection = nTrailingDamaged ? 0 : f(combinedPatchSize - 1, combinedPatchSize + 1);
-        return freeLeft + freeRight - freeLRIntersection;
+        return nPatchArrangements * nFollowingArrangements;
     }
 
     throw new Error("condition not handled");
